@@ -337,9 +337,12 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-ip-address-type: dualstack
     service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
-    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-subnets: subnet-078433bd3c62a28ba,subnet-04e2241811b9e51e6,subnet-08bbf4f7e6dfaf907
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: ingress-nginx
@@ -351,7 +354,7 @@ metadata:
 spec:
   externalTrafficPolicy: Local
   ipFamilies:
-  - IPv4
+  - IPv6
   ipFamilyPolicy: SingleStack
   ports:
   - appProtocol: http
