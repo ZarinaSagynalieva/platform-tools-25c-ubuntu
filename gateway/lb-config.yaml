@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway-system
+---
+# ALB customization for the shared Gateway. Referenced by the Gateway via
+# spec.infrastructure.parametersRef (namespace-local), so it lives in the same
+# namespace as the Gateway. Fields verified against the installed
+# loadbalancerconfigurations.gateway.k8s.aws/v1beta1 CRD schema.
+apiVersion: gateway.k8s.aws/v1beta1
+kind: LoadBalancerConfiguration
+metadata:
+  name: internet-facing-ipv6
+  namespace: gateway-system
+spec:
+  scheme: internet-facing
+  # dualstack is REQUIRED so the ALB can reach IPv6-only pods (and serve IPv4 clients).
+  ipAddressType: dualstack
+  loadBalancerSubnets:
+    - identifier: subnet-078433bd3c62a28ba
+    - identifier: subnet-04e2241811b9e51e6
+    - identifier: subnet-08bbf4f7e6dfaf907

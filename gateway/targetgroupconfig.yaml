@@ -1,0 +1,24 @@
+# Forces IP target-type for the hello Service's ALB target group.
+#
+# Why this is required: the ALB Gateway controller defaults to "instance"
+# targets, which need a NodePort/LoadBalancer Service and register node IPs.
+# This cluster is IPv6-only and "hello" is a ClusterIP Service, so the ALB must
+# target pod IPs directly ("ip") — the Gateway-API equivalent of the NLB's
+# service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip annotation.
+# Without it the controller loops with: "TargetGroup port is empty. When using
+# Instance targets, your service must be of type 'NodePort' or 'LoadBalancer'".
+#
+# Lives in "demo" (Option A): targetReference is namespace-local, and the app
+# team owns its routing + target config next to the Service.
+apiVersion: gateway.k8s.aws/v1beta1
+kind: TargetGroupConfiguration
+metadata:
+  name: hello
+  namespace: demo
+spec:
+  targetReference:
+    group: ""
+    kind: Service
+    name: hello
+  defaultConfiguration:
+    targetType: ip

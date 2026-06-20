@@ -1,0 +1,23 @@
+# Shared internet-facing ALB Gateway (HTTP only — TLS is a separate story).
+# Lives in gateway-system alongside its LoadBalancerConfiguration.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: shared-gateway
+  namespace: gateway-system
+spec:
+  gatewayClassName: aws-alb
+  # Namespace-local reference to the ALB customization (scheme/dualstack/subnets).
+  infrastructure:
+    parametersRef:
+      group: gateway.k8s.aws
+      kind: LoadBalancerConfiguration
+      name: internet-facing-ipv6
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      # Allow HTTPRoutes from any namespace (e.g. the demo app) to attach.
+      allowedRoutes:
+        namespaces:
+          from: All

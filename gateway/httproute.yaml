@@ -1,0 +1,30 @@
+# Migrates the classic ingress-nginx Ingress (host hello.local, path / -> hello:80)
+# to a Gateway API HTTPRoute on the shared ALB Gateway.
+#
+# Design (Option A): the HTTPRoute lives in "demo" with the app and its Service.
+#   - backendRef hello:80 is SAME-namespace -> no ReferenceGrant required.
+#   - parentRef is the shared-gateway in gateway-system (cross-namespace),
+#     permitted by that Gateway's listener allowedRoutes: from: All.
+#
+# The old Ingress had nginx.ingress.kubernetes.io/rewrite-target: / — that is a
+# no-op for path "/" (nothing to rewrite), and HTTPRoute has no equivalent
+# annotation. Intentionally DROPPED (no URLRewrite filter is needed here).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hello
+  namespace: demo
+spec:
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+  hostnames:
+    - hello.local
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: hello
+          port: 80
