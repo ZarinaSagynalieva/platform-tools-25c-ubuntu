@@ -1,0 +1,90 @@
+# Helm values for the kube-prometheus-stack chart (Prometheus, Grafana, Alertmanager).
+# Chart: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+#
+# Installed by .github/workflows/deploy-monitoring.yaml into the "monitoring" namespace.
+# Storage class "gp2" is the default on this EKS cluster (backed by the EBS CSI driver).
+
+fullnameOverride: kube-prometheus-stack
+
+# ---------------------------------------------------------------------------
+# Grafana — dashboards / metrics UI
+# ---------------------------------------------------------------------------
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: true        # ship the bundled Kubernetes dashboards
+  service:
+    type: ClusterIP                      # reach it with `kubectl port-forward` (see README)
+  persistence:
+    enabled: true
+    type: pvc
+    storageClassName: gp2
+    accessModes: ["ReadWriteOnce"]
+    size: 5Gi
+  # The admin password is auto-generated into the secret "kube-prometheus-stack-grafana".
+  # Retrieve it with:
+  #   kubectl -n monitoring get secret kube-prometheus-stack-grafana \
+  #     -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+
+# ---------------------------------------------------------------------------
+# Prometheus — metrics collection / storage
+# ---------------------------------------------------------------------------
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 15d
+    # Discover ServiceMonitors/PodMonitors from any namespace, not only those
+    # carrying this chart's release label.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+
+# ---------------------------------------------------------------------------
+# Alertmanager
+# ---------------------------------------------------------------------------
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+# ---------------------------------------------------------------------------
+# Operator + node/cluster-level exporters
+# ---------------------------------------------------------------------------
+prometheusOperator:
+  enabled: true
+nodeExporter:
+  enabled: true
+kubeStateMetrics:
+  enabled: true
+
+# ---------------------------------------------------------------------------
+# Control-plane scrape targets
+# On EKS the control plane is AWS-managed and these components do not expose
+# scrapable metrics endpoints, so we disable them to avoid permanent
+# "TargetDown" alerts. kube-proxy stays enabled (it runs as a DaemonSet).
+# ---------------------------------------------------------------------------
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: true
