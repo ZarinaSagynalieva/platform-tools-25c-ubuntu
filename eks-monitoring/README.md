@@ -18,15 +18,14 @@ managed control-plane scrape targets (`kube-controller-manager`, `kube-scheduler
 `etcd`) are disabled because they are not reachable on a managed control plane.
 
 ## How to Run/Execute
-Deployment is handled by GitHub Actions —
-[`.github/workflows/deploy-monitoring.yaml`](../.github/workflows/deploy-monitoring.yaml):
+Deployment is handled by the `deploy-monitoring` job in
+[`.github/workflows/deploy-platform-tools.yaml`](../.github/workflows/deploy-platform-tools.yaml),
+which runs automatically on pushes to `feature/**` and `main`.
 
-- Runs automatically on pushes that touch `eks-monitoring/**`.
-- Can be triggered manually via **workflow_dispatch** (optionally pinning a chart version).
-
-The workflow assumes the AWS role into the `ubuntu-dev-cluster` EKS cluster, adds the
+The job assumes the AWS role into the `ubuntu-dev-cluster` EKS cluster, adds the
 `prometheus-community` Helm repo, and runs `helm upgrade --install kube-prometheus-stack`
-against `values.yaml`.
+against `values.yaml`. It runs independently of the other platform-tool steps, so a
+failure elsewhere in the workflow does not block the monitoring deploy.
 
 ### Viewing the metrics
 

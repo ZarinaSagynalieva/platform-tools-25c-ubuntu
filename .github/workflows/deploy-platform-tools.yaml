@@ -15,6 +15,10 @@ permissions:
 env:
   AWS_REGION: "us-east-1"
   ENVIRONMENT_STAGE: "dev"
+  # Permanent EKS cluster created with Terraform.
+  CLUSTER_NAME: "ubuntu-dev-cluster"
+  MONITORING_NAMESPACE: "monitoring"
+  HELM_RELEASE: "kube-prometheus-stack"
 
 jobs:
   deploy-platform-tools:
@@ -34,9 +38,9 @@ jobs:
           role-session-name: GitHubActionsRoleSession
           aws-region: ${{ env.AWS_REGION }}
 
-      # Login to EKS, make sure to switch to the permanent cluster created with terraform once it's up
+      # Login to the permanent Terraform-created EKS cluster.
       - name: Login to EKS - update kubeconfig
-        run: aws eks update-kubeconfig --name temporary-eks-cluster-${ENVIRONMENT_STAGE} --region $AWS_REGION
+        run: aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
 
       # Add deployment steps for each tool below
       - name: Deploy ingress-nginx controller
@@ -59,4 +63,58 @@ jobs:
       - name: Finalize Deployment
         run: |
             echo "Final deployment steps and cleanup"
+
+  # ---------------------------------------------------------------------------
+  # EKS Monitoring — Prometheus & Grafana via the kube-prometheus-stack Helm chart.
+  # Runs as an independent job so it is not blocked by the other tools above.
+  # Chart docs: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+  # Values:     eks-monitoring/values.yaml
+  # ---------------------------------------------------------------------------
+  deploy-monitoring:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    environment: dev
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.IAM_ROLE }}
+          role-session-name: GitHubActionsRoleSession
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to EKS - update kubeconfig
+        run: aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.15.4
+
+      - name: Add prometheus-community Helm repo
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Deploy kube-prometheus-stack (Prometheus & Grafana)
+        run: |
+          helm upgrade --install "$HELM_RELEASE" prometheus-community/kube-prometheus-stack \
+            --namespace "$MONITORING_NAMESPACE" --create-namespace \
+            --values eks-monitoring/values.yaml \
+            --wait --timeout 15m
+
+      - name: Show deployed resources
+        run: |
+          echo "=== Pods ==="
+          kubectl -n "$MONITORING_NAMESPACE" get pods
+          echo "=== Services ==="
+          kubectl -n "$MONITORING_NAMESPACE" get svc
+          echo ""
+          echo "Grafana admin user: admin"
+          echo "Retrieve the Grafana admin password with:"
+          echo "  kubectl -n $MONITORING_NAMESPACE get secret ${HELM_RELEASE}-grafana -o jsonpath='{.data.admin-password}' | base64 -d ; echo"
 
