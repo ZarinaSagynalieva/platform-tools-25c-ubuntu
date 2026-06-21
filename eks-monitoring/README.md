@@ -29,16 +29,35 @@ failure elsewhere in the workflow does not block the monitoring deploy.
 
 ### Viewing the metrics
 
-Grafana and Prometheus are exposed as `ClusterIP` services. Port-forward to reach them:
+**Grafana is exposed through the shared ALB Gateway** (Gateway API) at host
+`grafana.local`. Two manifests in this folder wire it up (applied by the workflow):
+
+- [`targetgroupconfig.yaml`](./targetgroupconfig.yaml) — forces `targetType: ip`
+  (required: ClusterIP Service on an IPv6-only cluster).
+- [`httproute.yaml`](./httproute.yaml) — attaches `grafana.local` to `shared-gateway`
+  in `gateway-system` and routes `/` to `kube-prometheus-stack-grafana:80`.
+
+Because `grafana.local` is not a real DNS name, send the Host header to the ALB
+(get the ALB DNS from the Gateway), or add it to `/etc/hosts`:
 
 ```bash
-# Grafana -> http://localhost:3000  (user: admin)
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
+ALB=$(kubectl -n gateway-system get gateway shared-gateway \
+  -o jsonpath='{.status.addresses[0].value}')
 
-# Get the auto-generated Grafana admin password
+# Reach Grafana through the ALB (302 -> /login on success)
+curl -I -H "Host: grafana.local" "http://$ALB/"
+
+# Or map it for browser access, then open http://grafana.local
+echo "$(dig +short $ALB | head -1) grafana.local" | sudo tee -a /etc/hosts
+
+# Grafana login user: admin
 kubectl -n monitoring get secret kube-prometheus-stack-grafana \
   -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+```
 
+Prometheus stays internal (`ClusterIP`); reach it with a port-forward:
+
+```bash
 # Prometheus -> http://localhost:9090
 kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090:9090
 ```

@@ -1,0 +1,21 @@
+# Forces IP target-type for the Grafana Service's ALB target group.
+#
+# Required because this cluster is IPv6-only and kube-prometheus-stack-grafana is
+# a ClusterIP Service. The ALB Gateway controller defaults to "instance" targets,
+# which need a NodePort/LoadBalancer Service; without this the controller loops
+# with "TargetGroup port is empty. When using Instance targets, your service must
+# be of type 'NodePort' or 'LoadBalancer'". Same approach as gateway/targetgroupconfig.yaml.
+#
+# Lives in "monitoring": targetReference is namespace-local, next to the Service.
+apiVersion: gateway.k8s.aws/v1beta1
+kind: TargetGroupConfiguration
+metadata:
+  name: kube-prometheus-stack-grafana
+  namespace: monitoring
+spec:
+  targetReference:
+    group: ""
+    kind: Service
+    name: kube-prometheus-stack-grafana
+  defaultConfiguration:
+    targetType: ip

@@ -107,6 +107,14 @@ jobs:
             --values eks-monitoring/values.yaml \
             --wait --timeout 15m
 
+      # Expose Grafana through the shared ALB Gateway (Gateway API).
+      # TargetGroupConfiguration forces IP targets (ClusterIP Service on an
+      # IPv6-only cluster); HTTPRoute attaches grafana.local to the shared gateway.
+      - name: Expose Grafana via HTTPRoute
+        run: |
+          kubectl apply -f eks-monitoring/targetgroupconfig.yaml
+          kubectl apply -f eks-monitoring/httproute.yaml
+
       - name: Show deployed resources
         run: |
           echo "=== Pods ==="
